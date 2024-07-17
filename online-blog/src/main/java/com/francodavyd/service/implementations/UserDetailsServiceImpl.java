@@ -1,9 +1,12 @@
 package com.francodavyd.service.implementations;
 
 
+import com.francodavyd.dto.AuthCreateUser;
 import com.francodavyd.dto.AuthLoginRequestDTO;
 import com.francodavyd.dto.AuthResponseDTO;
+import com.francodavyd.model.Role;
 import com.francodavyd.model.UserSec;
+import com.francodavyd.repository.IRoleRepository;
 import com.francodavyd.repository.IUserSecRepository;
 import com.francodavyd.utils.JwtUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +14,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -21,6 +25,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class UserDetailsServiceImpl implements UserDetailsService {
@@ -30,6 +36,8 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     private JwtUtils jwtUtils;
     @Autowired
     private PasswordEncoder passwordEncoder;
+    @Autowired
+    private IRoleRepository repositoryR;
 
     @Override
     public UserDetails loadUserByUsername (String username) throws UsernameNotFoundException {
@@ -86,5 +94,39 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         return new UsernamePasswordAuthenticationToken(username, userDetails.getPassword(), userDetails.getAuthorities());
     }
 
+    public AuthResponseDTO createUser(AuthCreateUser createUser) {
+        String username = createUser.username();
+        String password = createUser.password();
+        List<String> roleListName = createUser.authCreateRoleRequest().roleListName();
+
+        Set<Role> roleSet = repositoryR.findByRoleIn(roleListName).stream().collect(Collectors.toSet());
+        if (roleSet.isEmpty()){
+            throw new IllegalArgumentException("The roles specified not exist");
+        }
+        UserSec userSec = UserSec.builder()
+                                 .username(username)
+                                 .password(passwordEncoder.encode(password))
+                                 .rolesList(roleSet)
+                                 .enabled(true)
+                                 .accountNotExpired(true)
+                                 .accountNotLocked(true)
+                                 .credentialNotExpired(true)
+                                 .build();
+        UserSec userCreated = repository.save(userSec);
+        List<SimpleGrantedAuthority> authorityList = new ArrayList<>();
+
+        userCreated.getRolesList().forEach(role -> authorityList
+                .add(new SimpleGrantedAuthority("ROLE_".concat(role.getRole()))));
+
+        userCreated.getRolesList().stream()
+                .flatMap(role -> role.getPermissionsList().stream())
+                .forEach(permission -> authorityList.add(new SimpleGrantedAuthority(permission.getPermissionName())));
+        Authentication authentication = new UsernamePasswordAuthenticationToken(userCreated.getUsername(),
+                userCreated.getPassword(), authorityList);
+        String accesToken = jwtUtils.createToken(authentication);
+        AuthResponseDTO responseDTO = new AuthResponseDTO(userCreated.getUsername(),
+                "Registered" , accesToken, true);
+        return responseDTO;
+    }
 }
 

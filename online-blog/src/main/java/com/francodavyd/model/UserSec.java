@@ -10,6 +10,7 @@ import java.util.Set;
 @Table(name="users")
 @Getter @Setter
 @AllArgsConstructor
+@Builder
 @NoArgsConstructor
 public class UserSec {
     @Id
