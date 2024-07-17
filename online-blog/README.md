@@ -85,12 +85,13 @@ Estructura JSON: <br>
 * POST (Request Body): localhost:8080/auth/login <br>
 # Controlador de registro <br>
 Estructura JSON: <br>
+----- "roleListName es un Array de String con los nombres de los roles, maximo 3." ----- <br>
 { <br>
 "username" : "example", <br>
 "password" : "example", <br>
 "authCreateRoleRequest" : { <br>
                       "roleListName" : [ <br>
-                                      "rolename"] <br>
+                                      "rolename" <br>] <br>
 } <br>
 } <br>
 * POST (Request Body): localhost/8080/auth/signup
